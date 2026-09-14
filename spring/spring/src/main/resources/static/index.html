@@ -33,5 +33,34 @@
             });
     </script>
 
+
+    <h1>Lista de testers</h1>
+
+    <ul id="listaTesters"></ul>
+
+    <script>
+        fetch('/testers')
+            .then(response => response.json())
+            .then(testers => {
+
+                const lista = document.getElementById('listaTesters');
+
+                testers.forEach(tester => {
+
+                    const li = document.createElement('li');
+
+                    li.textContent =
+                        tester.nombre + ' - ' + tester.email;
+
+                    lista.appendChild(li);
+                });
+
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    </script>
+
+
 </body>
 </html>

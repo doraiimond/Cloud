@@ -3,6 +3,8 @@ package com.CloudNative.spring.controller;
 import com.CloudNative.spring.Repository.UsuarioRepository;
 import com.CloudNative.spring.Model.Usuario;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -19,4 +21,9 @@ public class UsuarioController {
         return usuarioRepository.findAll();
     }
     
+    @PostMapping
+    public Usuario crearUsuario(@RequestBody Usuario usuario) {
+        return usuarioRepository.save(usuario);
+    }
+
 }
