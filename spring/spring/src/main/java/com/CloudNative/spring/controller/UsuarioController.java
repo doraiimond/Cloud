@@ -5,10 +5,12 @@ import com.CloudNative.spring.Model.Usuario;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+@RequestMapping("/api/v1/usuarios")
 @RestController 
 public class UsuarioController {
     
@@ -16,7 +18,7 @@ public class UsuarioController {
     public UsuarioController(UsuarioRepository usuarioRepository) {
         this.usuarioRepository = usuarioRepository;
     }
-    @GetMapping ("/usuarios")
+    @GetMapping
     public List<Usuario> getUsuarios() {        
         return usuarioRepository.findAll();
     }

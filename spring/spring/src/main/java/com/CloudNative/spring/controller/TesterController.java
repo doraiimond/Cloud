@@ -14,7 +14,7 @@ public class TesterController {
     public TesterController(TesterRepository testerRepository) {
         this.testerRepository = testerRepository;
     }
-    @GetMapping ("/testers")
+    @GetMapping ("/api/v1/testers")
     public List<Tester> getTesters() {        
         return testerRepository.findAll();
     }
