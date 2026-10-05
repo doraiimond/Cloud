@@ -1,39 +1,28 @@
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "./authConfig";
 
-const API_URL = "http://13.221.125.68:8080";
+const API_URL = "http://54.242.125.80:8080";
 
 function App() {
   const { instance, accounts, inProgress } = useMsal();
 
+  console.log("Cuentas:", accounts);
+  console.log("Estado:", inProgress);
+
   const iniciarSesion = async () => {
-    if (inProgress !== "none") {
-      return;
-    }
-
     try {
-      const response = await instance.loginPopup(loginRequest);
+      if (inProgress !== "none") {
+        return;
+      }
 
-      const usuario = {
-        nombre: response.account.name
-      };
-
-      await fetch(`${API_URL}/usuarios`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(usuario)
-      });
-
-      console.log("Usuario guardado:", usuario);
+      await instance.loginRedirect(loginRequest);
     } catch (error) {
-      console.error("Error al iniciar sesión:", error);
+      console.error("ERROR LOGIN:", error);
     }
   };
 
   const cerrarSesion = () => {
-    instance.logoutPopup();
+    instance.logoutRedirect();
   };
 
   if (accounts.length === 0) {
