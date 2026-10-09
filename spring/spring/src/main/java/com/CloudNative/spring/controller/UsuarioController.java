@@ -1,31 +1,46 @@
+
 package com.CloudNative.spring.controller;
 
-import com.CloudNative.spring.Repository.UsuarioRepository;
 import com.CloudNative.spring.Model.Usuario;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.CloudNative.spring.Repository.UsuarioRepository;
+import com.CloudNative.spring.Service.EventoService;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@RestController
 @RequestMapping("/api/v1/usuarios")
-@RestController 
 public class UsuarioController {
-    
+
     private final UsuarioRepository usuarioRepository;
-    public UsuarioController(UsuarioRepository usuarioRepository) {
+    private final EventoService eventoService;
+
+    public UsuarioController(
+            UsuarioRepository usuarioRepository,
+            EventoService eventoService) {
         this.usuarioRepository = usuarioRepository;
-    }
-    @GetMapping
-    public List<Usuario> getUsuarios() {        
-        return usuarioRepository.findAll();
-    }
-    
-    @PostMapping
-    public Usuario crearUsuario(@RequestBody Usuario usuario) {
-        return usuarioRepository.save(usuario);
+        this.eventoService = eventoService;
     }
 
+    @GetMapping
+    public List<Usuario> getUsuarios() {
+        List<Usuario> usuarios = usuarioRepository.findAll();
+
+        eventoService.registrar(
+                "Usuario", "CONSULTADO",
+                "Consulta de usuarios; resultados: " + usuarios.size());
+
+        return usuarios;
+    }
+
+    @PostMapping
+    public Usuario crearUsuario(@RequestBody Usuario usuario) {
+        Usuario creado = usuarioRepository.save(usuario);
+
+        eventoService.registrar(
+                "Usuario", "CREADO",
+                "Usuario creado con ID: " + creado.getId());
+
+        return creado;
+    }
 }
