@@ -17,20 +17,37 @@ public class EventoConsumer {
         this.eventoRepository = eventoRepository;
     }
 
-    @RabbitListener(queues = "cola1")
+    @RabbitListener(queues = "q.eventos.procesamiento")
     @Transactional
-    public void procesar(Long eventoId) {
+    public void procesarEvento(Long eventoId) {
+
+        System.out.println(
+                "Recibido evento para procesamiento. ID: " + eventoId
+        );
+
         Evento evento = eventoRepository.findById(eventoId)
                 .orElseThrow(() ->
                         new IllegalStateException(
-                                "No existe el evento " + eventoId));
+                                "No se encontró el evento ID: " + eventoId
+                        )
+                );
 
+        // Evitar procesar nuevamente un evento ya completado
+        if ("PROCESADO".equals(evento.getEstado())) {
+            System.out.println(
+                    "El evento ya estaba procesado. ID: " + eventoId
+            );
+            return;
+        }
+
+        // Aquí se ejecuta la lógica de procesamiento del evento
         evento.setEstado("PROCESADO");
         evento.setFechaProcesamiento(LocalDateTime.now());
+
         eventoRepository.save(evento);
 
         System.out.println(
-                "EVENTO PROCESADO: " + evento.getTipoEvento()
-                        + " | ID: " + evento.getId());
+                "Evento procesado correctamente. ID: " + eventoId
+        );
     }
 }

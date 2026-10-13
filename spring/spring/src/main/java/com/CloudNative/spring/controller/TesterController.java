@@ -26,9 +26,12 @@ public class TesterController {
     public List<Tester> getTesters() {
         List<Tester> testers = testerRepository.findAll();
 
-        eventoService.registrar(
-                "Tester", "CONSULTADO",
-                "Consulta de testers; resultados: " + testers.size());
+        eventoService.registrarEvento(
+                "TESTER_CONSULTADO",
+                "Tester",
+                "CONSULTAR",
+                "Consulta de testers; resultados: " + testers.size()
+        );
 
         return testers;
     }

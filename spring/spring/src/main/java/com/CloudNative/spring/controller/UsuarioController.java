@@ -26,9 +26,12 @@ public class UsuarioController {
     public List<Usuario> getUsuarios() {
         List<Usuario> usuarios = usuarioRepository.findAll();
 
-        eventoService.registrar(
-                "Usuario", "CONSULTADO",
-                "Consulta de usuarios; resultados: " + usuarios.size());
+        eventoService.registrarEvento(
+                "USUARIO_CONSULTADO",
+                "Usuario",
+                "CONSULTAR",
+                "Consulta de usuarios; resultados: " + usuarios.size()
+        );
 
         return usuarios;
     }
@@ -37,9 +40,12 @@ public class UsuarioController {
     public Usuario crearUsuario(@RequestBody Usuario usuario) {
         Usuario creado = usuarioRepository.save(usuario);
 
-        eventoService.registrar(
-                "Usuario", "CREADO",
-                "Usuario creado con ID: " + creado.getId());
+        eventoService.registrarEvento(
+                "USUARIO_CREADO",
+                "Usuario",
+                "CREAR",
+                "Usuario creado con ID: " + creado.getId()
+        );
 
         return creado;
     }
