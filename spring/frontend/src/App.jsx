@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "./authConfig";
 
-const API_BASE = "http://13.221.253.27:8080/api/v1";
+const API_BASE = "http://3.82.36.0:8080/api/v1";
 const NODOS = ["rabbit@rabbit1", "rabbit@rabbit2", "rabbit@rabbit3"];
 
 function decodificarParte(token, parte) {
@@ -132,6 +132,12 @@ export default function App() {
   const [guardando, setGuardando] = useState(false);
 
   const [mostrarUsuarios, setMostrarUsuarios] = useState(false);
+  const [mostrarHistorial, setMostrarHistorial] = useState(false);
+  const [cantidadPrueba, setCantidadPrueba] = useState(10);
+  const [enviandoPrueba, setEnviandoPrueba] = useState(false);
+  const [resultadoPrueba, setResultadoPrueba] = useState("");
+  const [errorPrueba, setErrorPrueba] = useState("");
+  const [actividadRabbit, setActividadRabbit] = useState([]);
 
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
@@ -255,6 +261,13 @@ export default function App() {
 
       setErrorRabbit("");
       setUltimaRabbit(new Date());
+      // Guardamos muestras de tasas reales para visualizar actividad reciente.
+      const exchangesApp = datos.exchanges.filter(x => x.name && !x.internal && !x.name.startsWith("amq."));
+      const publicados = exchangesApp.reduce((s, x) => s + (x.message_stats?.publish_in_details?.rate ?? 0), 0);
+      const confirmados = datos.queues.reduce((s, q) => s + (q.message_stats?.ack_details?.rate ?? 0), 0);
+      setActividadRabbit(prev => [...prev.slice(-29), {
+        hora: new Date().toLocaleTimeString("es-CL"), publicados, confirmados
+      }]);
     } catch (e) {
       setErrorRabbit(
         `No se pudo consultar RabbitMQ: ${e.message}`
@@ -285,6 +298,30 @@ export default function App() {
       clearInterval(intervaloRabbit);
     };
   }, [usuario?.homeAccountId]);
+
+  async function generarMensajesPrueba() {
+    setEnviandoPrueba(true);
+    setErrorPrueba("");
+    setResultadoPrueba("");
+    try {
+      const cantidad = Number(cantidadPrueba);
+      if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > 100) {
+        throw new Error("La cantidad debe estar entre 1 y 100.");
+      }
+      // Requiere implementar este endpoint en Spring Boot.
+      const respuesta = await solicitar("/rabbitmq/test", {
+        method: "POST",
+        body: JSON.stringify({ cantidad }),
+      });
+      setResultadoPrueba(respuesta?.mensaje || `Solicitud de ${cantidad} mensajes aceptada por el backend. Comprueba las métricas para verificar su publicación y consumo.`);
+      await cargarRabbit();
+      await cargarEventos(true);
+    } catch (e) {
+      setErrorPrueba(`No se pudieron generar mensajes: ${e.message}. Comprueba que POST /api/v1/rabbitmq/test exista en Spring Boot.`);
+    } finally {
+      setEnviandoPrueba(false);
+    }
+  }
 
   async function obtenerToken() {
     try {
@@ -347,6 +384,24 @@ export default function App() {
       binding.source &&
       !binding.source.startsWith("amq.")
   );
+
+  const publicacionesPorSegundo = exchangesAplicacion.reduce(
+    (s, x) => s + (x.message_stats?.publish_in_details?.rate ?? 0), 0
+  );
+  const ackPorSegundo = colas.reduce(
+    (s, q) => s + (q.message_stats?.ack_details?.rate ?? 0), 0
+  );
+  const entregasPorSegundo = colas.reduce(
+    (s, q) => s + (q.message_stats?.deliver_get_details?.rate ?? 0), 0
+  );
+  const publicadosAcumulados = exchangesAplicacion.reduce(
+    (s, x) => s + (x.message_stats?.publish_in ?? 0), 0
+  );
+  const ackAcumulados = colas.reduce(
+    (s, q) => s + (q.message_stats?.ack ?? 0), 0
+  );
+  const hayMetricasPublicacion = exchangesAplicacion.some(x => typeof x.message_stats?.publish_in === "number");
+  const hayMetricasAck = colas.some(q => typeof q.message_stats?.ack === "number");
 
   if (!usuario) {
     return (
@@ -733,6 +788,64 @@ export default function App() {
         />
       </section>
 
+      {/* DEMOSTRACIÓN DE MENSAJERÍA REAL */}
+      <section style={estilos.tarjeta}>
+        <p style={estilos.subtitulo}>RABBITMQ · DEMOSTRACIÓN</p>
+        <h2>Centro de pruebas de mensajería</h2>
+        <p style={estilos.textoSecundario}>
+          Genera mensajes desde Spring Boot y observa las estadísticas reales del broker.
+          El endpoint de prueba debe existir en el backend para habilitar el envío.
+        </p>
+        <div style={estilos.acciones}>
+          <label style={{ color: "#cbd5e1", fontSize: 13 }}>
+            Cantidad de mensajes
+            <select style={{ ...estilos.input, minWidth: 160 }} value={cantidadPrueba}
+              onChange={e => setCantidadPrueba(Number(e.target.value))}>
+              {[1, 10, 50, 100].map(n => <option key={n} value={n}>{n} mensaje{n === 1 ? "" : "s"}</option>)}
+            </select>
+          </label>
+          <button style={{ ...estilos.botonPrincipal, alignSelf: "end" }}
+            type="button" disabled={enviandoPrueba} onClick={generarMensajesPrueba}>
+            {enviandoPrueba ? "Enviando..." : "Generar mensajes"}
+          </button>
+          <button style={{ ...estilos.botonSecundario, alignSelf: "end" }}
+            type="button" onClick={() => cargarRabbit()} disabled={cargandoRabbit}>
+            Actualizar métricas
+          </button>
+        </div>
+        {resultadoPrueba && <p style={{ color: "#86efac" }} role="status">{resultadoPrueba}</p>}
+        {errorPrueba && <p style={estilos.error} role="alert">{errorPrueba}</p>}
+        <div style={estilos.resumen}>
+          {[
+            ["Publicados (acumulado)", hayMetricasPublicacion ? publicadosAcumulados : "—"],
+            ["ACK (acumulado)", hayMetricasAck ? ackAcumulados : "—"],
+            ["Publicaciones / s", publicacionesPorSegundo.toFixed(2)],
+            ["Entregas / s", entregasPorSegundo.toFixed(2)],
+            ["ACK / s", ackPorSegundo.toFixed(2)],
+            ["Consumidores", consumidores],
+          ].map(([titulo, valor]) => (
+            <div style={estilos.tarjetaResumen} key={titulo}>
+              {titulo}<strong style={{ fontSize: 23, color: "#e5e7eb" }}>{valor}</strong>
+            </div>
+          ))}
+        </div>
+        <h3>Actividad reciente (últimas 30 consultas)</h3>
+        <div style={{ display: "flex", alignItems: "end", gap: 3, height: 110, padding: "10px 0", borderBottom: "1px solid #334155" }}>
+          {actividadRabbit.map((m, i) => {
+            const maximo = Math.max(1, ...actividadRabbit.flatMap(x => [x.publicados, x.confirmados]));
+            return <div key={i} title={`${m.hora}: ${m.publicados.toFixed(2)} publicados/s; ${m.confirmados.toFixed(2)} ACK/s`}
+              style={{ display: "flex", alignItems: "end", gap: 1, flex: 1, height: "100%" }}>
+              <div style={{ flex: 1, height: `${Math.max(2, 100 * m.publicados / maximo)}%`, background: "#60a5fa", borderRadius: "3px 3px 0 0" }} />
+              <div style={{ flex: 1, height: `${Math.max(2, 100 * m.confirmados / maximo)}%`, background: "#86efac", borderRadius: "3px 3px 0 0" }} />
+            </div>;
+          })}
+        </div>
+        <p style={estilos.textoSecundario}>
+          <span style={{ color: "#60a5fa" }}>■</span> Publicaciones/s · <span style={{ color: "#86efac" }}>■</span> ACK/s.
+          Las tasas pueden volver a cero tras procesar los mensajes. Los contadores acumulados dependen de las estadísticas que entregue Management y pueden reiniciarse.
+        </p>
+      </section>
+
       {/* GESTIÓN DE USUARIOS */}
       <section style={estilos.tarjeta}>
         <p style={estilos.subtitulo}>
@@ -843,6 +956,10 @@ export default function App() {
             </p>
 
             <h2>Historial de eventos</h2>
+            <button type="button" style={estilos.botonSecundario}
+              onClick={() => setMostrarHistorial(v => !v)}>
+              {mostrarHistorial ? "Ocultar historial" : "Mostrar historial"}
+            </button>
 
             <p style={estilos.textoSecundario}>
               Eventos almacenados en RDS y procesados mediante RabbitMQ.
@@ -885,6 +1002,7 @@ export default function App() {
           <p style={estilos.error}>{errorEventos}</p>
         )}
 
+        {mostrarHistorial && (
         <Tabla
           columnas={[
             "ID",
@@ -937,6 +1055,8 @@ export default function App() {
             </tr>
           ))}
         />
+
+        )}
 
         <p style={estilos.textoSecundario}>
           {ultimaActualizacion
