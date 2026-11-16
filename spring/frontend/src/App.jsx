@@ -3,8 +3,9 @@ import { useEffect, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "./authConfig";
 
-const API_BASE = "http://3.82.36.0:8080/api/v1";
+const API_BASE = "http://184.197.190.98:8080/api/v1";
 const NODOS = ["rabbit@rabbit1", "rabbit@rabbit2", "rabbit@rabbit3"];
+const KAFKA_UI_URL = import.meta.env.VITE_KAFKA_UI_URL || "http://mensajeria:8080";
 
 function decodificarParte(token, parte) {
   try {
@@ -154,6 +155,14 @@ export default function App() {
   const [cargandoRabbit, setCargandoRabbit] = useState(false);
   const [ultimaRabbit, setUltimaRabbit] = useState(null);
 
+  const [kafkaTopics, setKafkaTopics] = useState([]);
+  const [kafkaGroups, setKafkaGroups] = useState([]);
+  const [kafkaConsumed, setKafkaConsumed] = useState({});
+  const [errorKafka, setErrorKafka] = useState("");
+  const [cargandoKafka, setCargandoKafka] = useState(false);
+  const [resultadoKafka, setResultadoKafka] = useState("");
+  const [cantidadKafka, setCantidadKafka] = useState(1);
+
   async function cargarEventos(silencioso = false) {
     if (!silencioso) setCargandoEventos(true);
 
@@ -277,11 +286,44 @@ export default function App() {
     }
   }
 
+  async function cargarKafka(silencioso = false) {
+    if (!silencioso) setCargandoKafka(true);
+    try {
+      const datos = await solicitar("/kafka/monitor");
+      if (!Array.isArray(datos?.topics) || !Array.isArray(datos?.consumerGroups)) {
+        throw new Error("El backend devolvió un formato Kafka inesperado.");
+      }
+      setKafkaTopics(datos.topics);
+      setKafkaGroups(datos.consumerGroups);
+      setKafkaConsumed(datos.consumed || {});
+      setErrorKafka("");
+    } catch (e) {
+      setErrorKafka(`No se pudo consultar Kafka: ${e.message}`);
+    } finally {
+      if (!silencioso) setCargandoKafka(false);
+    }
+  }
+
+  async function generarMensajesKafka() {
+    setResultadoKafka("");
+    try {
+      const respuesta = await solicitar("/kafka/test", {
+        method: "POST",
+        body: JSON.stringify({ cantidad: Number(cantidadKafka) }),
+      });
+      setResultadoKafka(respuesta?.mensaje || "Eventos Kafka enviados.");
+      await cargarKafka();
+    } catch (e) {
+      setErrorKafka(`No se pudieron generar eventos Kafka: ${e.message}`);
+    }
+  }
+
   useEffect(() => {
     if (!usuario) return;
 
     cargarEventos();
     cargarRabbit();
+    cargarKafka();
 
     const intervaloEventos = setInterval(
       () => cargarEventos(true),
@@ -293,9 +335,15 @@ export default function App() {
       15000
     );
 
+    const intervaloKafka = setInterval(
+      () => cargarKafka(true),
+      15000
+    );
+
     return () => {
       clearInterval(intervaloEventos);
       clearInterval(intervaloRabbit);
+      clearInterval(intervaloKafka);
     };
   }, [usuario?.homeAccountId]);
 
@@ -428,6 +476,65 @@ export default function App() {
 
   return (
     <main style={estilos.contenedor}>
+      <section style={estilos.tarjeta}>
+        <div style={estilos.encabezadoSeccion}>
+          <div>
+            <p style={estilos.subtitulo}>KAFKA · MENSAJERÍA EVENT-DRIVEN</p>
+            <h2>Tópicos, consumidores y Kafka UI</h2>
+          </div>
+          <div style={estilos.acciones}>
+            <button type="button" style={estilos.botonSecundario}
+              onClick={() => cargarKafka()} disabled={cargandoKafka}>
+              {cargandoKafka ? "Consultando..." : "Actualizar Kafka"}
+            </button>
+            <a href={KAFKA_UI_URL} target="_blank" rel="noreferrer" style={estilos.botonSecundario}>
+              Abrir Kafka UI
+            </a>
+          </div>
+        </div>
+        {errorKafka && <p style={estilos.error}>{errorKafka}</p>}
+        {resultadoKafka && <p style={{ color: "#86efac" }} role="status">{resultadoKafka}</p>}
+        <div style={estilos.resumen}>
+          <div style={estilos.tarjetaResumen}>Tópicos<strong>{kafkaTopics.length}</strong></div>
+          <div style={estilos.tarjetaResumen}>Consumer groups<strong>{kafkaGroups.length}</strong></div>
+          <div style={estilos.tarjetaResumen}>Eventos consumidos<strong>{kafkaConsumed.events ?? 0}</strong></div>
+          <div style={estilos.tarjetaResumen}>Notificaciones consumidas<strong>{kafkaConsumed.notifications ?? 0}</strong></div>
+        </div>
+        <div style={estilos.acciones}>
+          <label style={{ color: "#cbd5e1", fontSize: 13 }}>
+            Eventos de prueba
+            <select style={{ ...estilos.input, minWidth: 140 }} value={cantidadKafka}
+              onChange={e => setCantidadKafka(Number(e.target.value))}>
+              {[1, 10, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+          <button type="button" style={estilos.botonPrincipal} onClick={generarMensajesKafka}>
+            Publicar en Kafka
+          </button>
+        </div>
+        <Tabla
+          columnas={["Tópico", "Particiones", "Réplicas", "Retención", "Cleanup policy"]}
+          filas={kafkaTopics.map(topic => (
+            <tr key={topic.name}>
+              <td style={estilos.celda}><strong>{topic.name}</strong></td>
+              <td style={estilos.celda}>{topic.partitions ?? 0}</td>
+              <td style={estilos.celda}>{topic.replicas ?? 0}</td>
+              <td style={estilos.celda}>{topic.retentionMs || "default"}</td>
+              <td style={estilos.celda}>{topic.cleanupPolicy || "delete"}</td>
+            </tr>
+          ))}
+        />
+        <h3>Consumer groups</h3>
+        <Tabla
+          columnas={["Grupo", "Estado"]}
+          filas={kafkaGroups.map(group => (
+            <tr key={group.id}>
+              <td style={estilos.celda}>{group.id}</td>
+              <td style={estilos.celda}>{group.state || "unknown"}</td>
+            </tr>
+          ))}
+        />
+      </section>
       <header style={estilos.encabezado}>
         <div>
           <p style={estilos.subtitulo}>

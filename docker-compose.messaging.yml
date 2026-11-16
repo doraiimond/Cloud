@@ -1,0 +1,103 @@
+services:
+  rabbit1:
+    image: rabbitmq:4-management
+    hostname: rabbit1
+    container_name: rabbit1
+    environment:
+      RABBITMQ_ERLANG_COOKIE: cloud-rabbit-cluster-cookie
+      RABBITMQ_DEFAULT_USER: usuario1
+      RABBITMQ_DEFAULT_PASS: 676767
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbit1-data:/var/lib/rabbitmq
+    networks: [mensajeria]
+
+  rabbit2:
+    image: rabbitmq:4-management
+    hostname: rabbit2
+    container_name: rabbit2
+    environment:
+      RABBITMQ_ERLANG_COOKIE: cloud-rabbit-cluster-cookie
+      RABBITMQ_DEFAULT_USER: usuario1
+      RABBITMQ_DEFAULT_PASS: 676767
+      RABBITMQ_DEFAULT_VHOST: /
+    command: >-
+      bash -ec "rabbitmq-server &
+      until rabbitmq-diagnostics -q ping; do sleep 2; done;
+      rabbitmqctl stop_app; rabbitmqctl reset;
+      rabbitmqctl join_cluster rabbit@rabbit1; rabbitmqctl start_app; wait"
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    volumes:
+      - rabbit2-data:/var/lib/rabbitmq
+    depends_on: [rabbit1]
+    networks: [mensajeria]
+
+  rabbit3:
+    image: rabbitmq:4-management
+    hostname: rabbit3
+    container_name: rabbit3
+    environment:
+      RABBITMQ_ERLANG_COOKIE: cloud-rabbit-cluster-cookie
+      RABBITMQ_DEFAULT_USER: usuario1
+      RABBITMQ_DEFAULT_PASS: 676767
+      RABBITMQ_DEFAULT_VHOST: /
+    command: >-
+      bash -ec "rabbitmq-server &
+      until rabbitmq-diagnostics -q ping; do sleep 2; done;
+      rabbitmqctl stop_app; rabbitmqctl reset;
+      rabbitmqctl join_cluster rabbit@rabbit1; rabbitmqctl start_app; wait"
+    ports:
+      - "5674:5672"
+      - "15674:15672"
+    volumes:
+      - rabbit3-data:/var/lib/rabbitmq
+    depends_on: [rabbit1]
+    networks: [mensajeria]
+
+  kafka:
+    image: apache/kafka:4.0.0
+    container_name: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks: [mensajeria]
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    environment:
+      KAFKA_CLUSTERS_0_NAME: cloud
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    depends_on: [kafka]
+    networks: [mensajeria]
+
+volumes:
+  rabbit1-data:
+  rabbit2-data:
+  rabbit3-data:
+  kafka-data:
+
+networks:
+  mensajeria:
+    driver: bridge

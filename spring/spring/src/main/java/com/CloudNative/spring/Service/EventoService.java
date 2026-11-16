@@ -2,21 +2,29 @@ package com.CloudNative.spring.Service;
 
 import com.CloudNative.spring.Model.Evento;
 import com.CloudNative.spring.Repository.EventoRepository;
+import com.CloudNative.spring.kafka.KafkaProducerService;
+import com.CloudNative.spring.kafka.dto.KafkaEventDto;
+import com.CloudNative.spring.kafka.dto.KafkaNotificationDto;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
 
 @Service
 public class EventoService {
 
     private final EventoRepository eventoRepository;
     private final RabbitTemplate rabbitTemplate;
+    private final KafkaProducerService kafkaProducer;
 
     public EventoService(
             EventoRepository eventoRepository,
-            RabbitTemplate rabbitTemplate) {
+            RabbitTemplate rabbitTemplate,
+            KafkaProducerService kafkaProducer) {
         this.eventoRepository = eventoRepository;
         this.rabbitTemplate = rabbitTemplate;
+        this.kafkaProducer = kafkaProducer;
     }
 
     @Transactional
@@ -49,6 +57,12 @@ public class EventoService {
                 "evento.notificacion",
                 guardado.getId()
         );
+
+        KafkaEventDto kafkaEvent = KafkaEventDto.of(
+                guardado.getId(), tipoEvento, entidad, operacion, detalle);
+        kafkaProducer.publishEvent(kafkaEvent);
+        kafkaProducer.publishNotification(new KafkaNotificationDto(
+                kafkaEvent.eventId(), "EVENTO", entidad, detalle, Instant.now()));
 
         return guardado;
     }
