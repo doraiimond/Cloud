@@ -1,11 +1,13 @@
-
 import { useEffect, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "./authConfig";
 
-const API_BASE = "http://184.197.190.98:8080/api/v1";
+
+const RABBITMQ_UI_URL = "http://3.233.102.102:15673";
+const API_BASE = "/api/v1";
 const NODOS = ["rabbit@rabbit1", "rabbit@rabbit2", "rabbit@rabbit3"];
-const KAFKA_UI_URL = import.meta.env.VITE_KAFKA_UI_URL || "http://mensajeria:8080";
+const KAFKA_UI_URL = "http://3.233.102.102:8081";
+
 
 function decodificarParte(token, parte) {
   try {
@@ -487,7 +489,12 @@ export default function App() {
               onClick={() => cargarKafka()} disabled={cargandoKafka}>
               {cargandoKafka ? "Consultando..." : "Actualizar Kafka"}
             </button>
-            <a href={KAFKA_UI_URL} target="_blank" rel="noreferrer" style={estilos.botonSecundario}>
+            <a
+              href={KAFKA_UI_URL}
+              target="_blank"
+              rel="noreferrer"
+              style={estilos.botonEnlaceSecundario}
+            >
               Abrir Kafka UI
             </a>
           </div>
@@ -633,15 +640,26 @@ export default function App() {
             <h2>Clúster RabbitMQ</h2>
           </div>
 
-          <button
-            style={estilos.botonSecundario}
-            disabled={cargandoRabbit}
-            onClick={() => cargarRabbit()}
-          >
-            {cargandoRabbit
-              ? "Consultando..."
-              : "Actualizar RabbitMQ"}
-          </button>
+          <div style={estilos.acciones}>
+            <button
+              style={estilos.botonSecundario}
+              disabled={cargandoRabbit}
+              onClick={() => cargarRabbit()}
+            >
+              {cargandoRabbit
+                ? "Consultando..."
+                : "Actualizar RabbitMQ"}
+            </button>
+
+            <a
+              href={RABBITMQ_UI_URL}
+              target="_blank"
+              rel="noreferrer"
+              style={estilos.botonEnlaceSecundario}
+            >
+              RabbitMQ Management
+            </a>
+          </div>
         </div>
 
         {errorRabbit && (
@@ -1264,6 +1282,19 @@ const estilos = {
     border: "1px solid #334155",
     borderRadius: 8,
     padding: "10px 14px",
+    cursor: "pointer",
+  },
+
+  botonEnlaceSecundario: {
+    display: "inline-flex",
+    alignItems: "center",
+    background: "#1e293b",
+    color: "#e2e8f0",
+    border: "1px solid #334155",
+    borderRadius: 8,
+    padding: "10px 14px",
+    textDecoration: "none",
+    fontSize: 13.33,
     cursor: "pointer",
   },
 

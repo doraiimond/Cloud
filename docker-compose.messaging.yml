@@ -29,9 +29,6 @@ services:
       until rabbitmq-diagnostics -q ping; do sleep 2; done;
       rabbitmqctl stop_app; rabbitmqctl reset;
       rabbitmqctl join_cluster rabbit@rabbit1; rabbitmqctl start_app; wait"
-    ports:
-      - "5673:5672"
-      - "15673:15672"
     volumes:
       - rabbit2-data:/var/lib/rabbitmq
     depends_on: [rabbit1]
@@ -51,9 +48,6 @@ services:
       until rabbitmq-diagnostics -q ping; do sleep 2; done;
       rabbitmqctl stop_app; rabbitmqctl reset;
       rabbitmqctl join_cluster rabbit@rabbit1; rabbitmqctl start_app; wait"
-    ports:
-      - "5674:5672"
-      - "15674:15672"
     volumes:
       - rabbit3-data:/var/lib/rabbitmq
     depends_on: [rabbit1]

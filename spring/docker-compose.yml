@@ -1,0 +1,16 @@
+services:
+  spring:
+    build: ./spring
+    container_name: spring
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - spring
+    restart: unless-stopped
